@@ -1,0 +1,138 @@
+// When color definition differs for dark and light variant
+// it gets @if ed depending on $variant
+/// yiq
+
+@function yiq($color) {
+  $red  : red($color);
+  $green: green($color);
+  $blue : blue($color);
+
+  @return (($red*.299)+($green*.587)+($blue*.114));
+}
+
+@function yiq-contrast-color($background, $dark:#000, $light:#fff) {
+  @if yiq($background) >= 128 {
+    @return $dark;
+  } @else {
+    @return $light;
+  }
+}
+//
+$planifolia-colorspace: 'lab' !default;
+// desaturated light base and bg colors
+$base-dst: pf-desaturate(#93d4f4, 38);
+$bg-dst: pf-desaturate(#57c3ef, 38);
+//
+$bg-dst-l: pf-adjust-color(pf-desaturate(#57c3ef, 38), $lightness: 5);
+$bg-dst-cmp: pf-adjust-color(pf-desaturate(pf-complement(#57c3ef), 38), $lightness: 5);
+$base-dst-cmp-cmbo: pf-mix($bg-dst-l, $bg-dst-cmp, 45%);
+//
+$base-dark-dst: pf-desaturate(#131e23, 4);
+$bg-dark-dst-l: pf-adjust-color(pf-saturate(#060a0c, 4), $lightness: 4.5);
+$bg-dark-dst-cmp: pf-adjust-color(pf-desaturate(pf-complement(#060a0c), 4), $lightness: 4.5);
+$base-dark-dst-cmp-cmbo: pf-mix(pf-darken(pf-mix($bg-dark-dst-l, $bg-dark-dst-cmp, 45%), 1.45), #000, 54%);
+//
+//
+// Nearly Black Blue
+$bb: #020304;
+// Nearly White Blue
+$wb: #fefeff;
+//
+//
+// base dark-button color for colored* types
+$dc: #0d1417;
+//fg color
+$background: if($variant == 'light', $bg-dst, #060a0c);
+$foreground: yiq-contrast-color($background, darken($background, 56%), lighten($background, 56%));
+//text color
+$background-text: if($variant == 'light', $base-dst, $base-dark-dst);
+$foreground-text: yiq-contrast-color($background-text, darken($background-text, 68%), lighten($background-text, 68%));
+
+// button normal
+$background-button: if($variant == 'light', pf-darken($bg-dst, 3.5), pf-darken($dc, 1));
+$foreground-button: yiq-contrast-color($background-button, darken($background-button, 56%), lighten($background-button, 56%));
+$button_fg_normal: if($variant == 'light', $foreground-button, $foreground-button);
+// button hover
+$background-button-hover: if($variant == 'light', $bg-dst, pf-darken($dc, 1));
+$foreground-button-hover: yiq-contrast-color($background-button-hover, darken($background-button-hover, 56%), lighten($background-button-hover, 56%));
+$button_fg_normal_hover: if(variant == 'light', $foreground-button-hover, $foreground-button-hover);
+// button active
+$active_fill_light: pf-desaturate(pf-darken($bg-dst, 6),22);
+$active_fill_dark: pf-darken(pf-adjust-color(pf-saturate($dc, 3), $lightness: 4, $chroma: 3), 1.5);
+
+$background-button-active: if($variant == 'light', $active_fill_light, $active_fill_dark);
+$foreground-button-active: yiq-contrast-color($background-button-active, darken($background-button-active, 56%), lighten($background-button-active, 56%));
+$button_fg_normal_active: if(variant == 'light', $foreground-button-active, $foreground-button-active);
+//
+///
+
+$base_color: if($variant == 'light', $base-dst-cmp-cmbo, $base-dark-dst-cmp-cmbo);
+$text_color: if($variant == 'light', $foreground-text, $foreground-text);
+$bg_color: if($variant == 'light', $bg-dst, #060a0c);
+$fg_color: if($variant == 'light', $foreground, $foreground);
+
+$selected_bg_color: if($variant == 'light', #0EBAEC, pf-darken(#0EBAEC, 11));
+$selected_fg_color: yiq-contrast-color($selected_bg_color, darken($selected_bg_color, 65%), darken($selected_bg_color, 65%));
+$selected_borders_color: if($variant== 'light', pf-darken($selected_bg_color, 33), pf-darken($selected_bg_color, 22));
+$borders_color: if($variant == 'light', pf-darken($bg_color, 22), pf-darken($bg_color, 11));
+$alt_borders_color: if($variant == 'light', pf-darken($bg_color, 37), pf-darken($bg_color, 19));
+$borders_edge: if($variant == 'light', transparentize(lch(100,0,180, 'lab'), 0.2), transparentize($fg_color, 0.93));
+$link_color: if($variant == 'light', pf-darken($selected_bg_color, 11), pf-lighten($selected_bg_color, 22));
+$link_visited_color: if($variant == 'light', pf-darken($selected_bg_color, 22), pf-lighten($selected_bg_color, 11));
+$top_hilight: $borders_edge;
+$dark_fill: pf-mix($borders_color, $bg_color, 50%);
+$headerbar_color: if($variant == 'light', pf-lighten($bg_color, 5), pf-darken($bg_color, 3));
+$menu_color: if($variant == 'light', $base_color, pf-mix($bg_color, $base_color, 20%));
+$popover_bg_color: $bg_color;
+$popover_hover_color: pf-lighten($bg_color, 5);
+
+$scrollbar_bg_color: if($variant == 'light', pf-mix($bg_color, $fg_color, 80%), pf-mix($base_color, $bg_color, 50%));
+$scrollbar_slider_color: pf-mix($fg_color, $bg_color, 60%);
+$scrollbar_slider_hover_color: pf-mix($fg_color, $bg_color, 80%);
+$scrollbar_slider_active_color: if($variant=='light', pf-darken($selected_bg_color, 11), pf-lighten($selected_bg_color, 11));
+
+$warning_color: pf-saturate(pf-complement(#0EBAEC, 'lab'), 11);
+$error_color: pf-change-color(pf-saturate(#EC0E39, 11, 'lab'), $lightness:62, $chroma:76) ;
+$success_color: if($variant == 'light', #4BEC0E, pf-darken(#4BEC0E, 11));
+$destructive_color: if($variant == 'light', #EC0E39, pf-darken(#EC0E39, 11));
+
+$osd_bg: if($variant == 'light', pf-darken(pf-desaturate($bg_color, 60, 'lab'), 22), pf-darken(pf-desaturate($bg_color, 60, 'lab'), 11));
+$osd_fg_color: yiq-contrast-color($osd_bg, darken($osd_bg, 50%), lighten($osd_bg, 50%));
+$osd_text_color: yiq-contrast-color($osd_bg, darken($osd_bg, 80%), lighten($osd_bg, 80%));
+$osd_bg_color: if($variant == 'light', transparentize($osd_bg, 0.3), transparentize($osd_bg, 0.3));
+$osd_insensitive_bg_color: if($variant == 'light', transparentize(pf-mix($osd_fg_color, opacify($osd_bg_color, 1), 10%), 0.5), transparentize(pf-mix($osd_fg_color, opacify($osd_bg_color, 1), 10%), 0.5));
+$osd_insensitive_fg_color: if($variant == 'light', pf-mix($osd_fg_color, opacify($osd_bg_color, 1), 50%), pf-mix($osd_fg_color, opacify($osd_bg_color, 1), 50%));
+$osd_borders_color: if($variant == 'light', transparentize(pf-darken($osd_bg, 22), 0.3), transparentize(pf-darken($osd_bg, 11), 0.3));
+
+$sidebar_bg_color: pf-mix($bg_color, $base_color, 50%);
+$base_hover_color: transparentize($fg_color, 0.95);
+
+$tootlip: if($variant == 'light', pf-desaturate(pf-darken(#e9f5fb, 80),60), pf-desaturate(pf-lighten(#0a1012, 80),60));
+$tooltip_fg_contrast: yiq-contrast-color($tootlip, lighten($tootlip, 80%), darken($tootlip, 80%));
+$tooltip_bg_color: if($variant == 'light', $tootlip, $tootlip);
+$tooltip_fg_color: if($variant == 'light', $tooltip_fg_contrast, $tooltip_fg_contrast);
+$shadow_contrast: yiq-contrast-color($tooltip_fg_contrast, darken($tooltip_fg_contrast,50%), lighten($tooltip_fg_contrast,50%));
+$shadow_color: transparentize($shadow_contrast, 0.9);
+
+$drop_target_color: pf-desaturate(pf-darken($success_color, 33), 22, 'lab');
+
+//insensitive state derived colors
+$insensitive_fg_color: pf-mix($fg_color, $bg_color, 50%);
+$insensitive_bg_color: pf-mix($bg_color, $base_color, 60%);
+$insensitive_borders_color: $borders_color;
+
+//colors for the backdrop state, derived from the main colors.
+$backdrop_base_color: if($variant == 'light', pf-mix(pf-darken($base_color, 1), #000, 90%), pf-mix(pf-darken($base_color, 1), #000, 86%));
+$backdrop_text_color: pf-mix($text_color, $backdrop_base_color, 80%);
+$backdrop_bg_color: if($variant == 'light', pf-mix(pf-darken($bg_color, 0.5), #000, 88%), pf-mix(pf-darken($bg_color, 0.5), #000, 84%));
+$backdrop_fg_color: pf-mix($fg_color, $backdrop_bg_color, 50%);
+$backdrop_insensitive_color: if($variant == 'light', pf-darken($backdrop_bg_color, 15), pf-lighten($backdrop_bg_color, 15));
+$backdrop_selected_fg_color: if($variant == 'light', pf-mix($selected_fg_color, $backdrop_bg_color, 50%), pf-mix($selected_fg_color, $backdrop_text_color, 50%));
+$backdrop_borders_color: pf-mix($borders_color, $bg_color, 80%);
+$backdrop_dark_fill: pf-mix($backdrop_borders_color, $backdrop_bg_color, 35%);
+$backdrop_sidebar_bg_color: pf-mix($backdrop_bg_color, $backdrop_base_color, 50%);
+
+$backdrop_scrollbar_bg_color: pf-darken($backdrop_bg_color, 3);
+$backdrop_scrollbar_slider_color: pf-mix($backdrop_fg_color, $backdrop_bg_color, 40%);
+
+$backdrop_menu_color: if($variant == 'light', $backdrop_base_color, pf-mix($backdrop_bg_color, $backdrop_base_color, 20%));

@@ -1,0 +1,29 @@
+{
+  "name": "viperr-3.22",
+  "version": "1.0.0",
+  "description": "default gtk theme for viperr os",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "keywords": [
+    "viperr"
+  ],
+  "author": "killhellokitty",
+  "license": "ISC",
+  "devDependencies": {
+    "chroma-js": "^1.2.1",
+    "chromatic-sass": "0.0.1",
+    "chromatic-sass": "^0.1.7",
+    "gulp": "^3.9.1",
+    "gulp-cache": "^0.4.5",
+    "gulp-imagemin": "^3.1.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-sass": "^2.3.2",
+    "sass-planifolia": "^0.3.1",
+    "sass-yiq": "^1.0.0"
+  },
+  "dependencies": {
+    "os-tmpdir": "^1.0.2"
+  }
+}

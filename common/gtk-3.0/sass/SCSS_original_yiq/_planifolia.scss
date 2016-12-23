@@ -1,0 +1,884 @@
+////
+/// This module provides functions that can be used as drop-in replacements for
+/// some of the HSL based functions included in Sass.
+///
+/// The implementations use sRGB for input colors (including the whitepoint
+/// D65) and converts them to CIELAB by default, but CIELUV, HSL or YUV are
+/// also possible.
+///
+/// CIELAB and CIELUV both try to be close to  human perception, so they may
+/// give nicer results in many cases than simple RGB/HSL.
+///
+/// @group color
+////
+
+/// @type string
+$planifolia-colorspace: 'lab' !default;
+
+@function _pf-perc($x) {
+  @return if(unit($x) == '%', $x / 100%, $x);
+}
+
+@function _pf-clip-needed($rgb) {
+  @for $i from 1 through 3 {
+    @if nth($rgb, $i) < 0 {
+      @return true;
+    } @else if nth($rgb, $i) > 255 {
+      @return true;
+    }
+  }
+  @return false;
+}
+
+@function _pf-srgb-to-rgb($c) {
+  $c: $c / 255;
+  @if $c <= .04045 {
+    $c: $c / 12.92;
+  } @else {
+    $c: pow(($c + .055) / 1.055, 2.4);
+  }
+  @return $c * 100;
+}
+
+@function _pf-rgb-to-srgb($c) {
+  $c: $c / 100;
+  @if $c <= .0031308 {
+    $c: $c * 12.92;
+  } @else {
+    $c: 1.055 * pow($c, 1 / 2.4) - .055;
+  }
+  @return $c * 255;
+}
+
+@function _pf-to-xyz($color) {
+  $r: _pf-srgb-to-rgb(red($color));
+  $g: _pf-srgb-to-rgb(green($color));
+  $b: _pf-srgb-to-rgb(blue($color));
+
+  $x: .4124 * $r + .3576 * $g + .1805 * $b;
+  $y: .2126 * $r + .7152 * $g + .0722 * $b;
+  $z: .0193 * $r + .1192 * $g + .9505 * $b;
+
+  @return ($x, $y, $z);
+}
+
+@function _pf-from-xyz($xyz) {
+  $r: 3.2406 * nth($xyz, 1) - 1.5372 * nth($xyz, 2) - .4986 * nth($xyz, 3);
+  $g: -.9689 * nth($xyz, 1) + 1.8758 * nth($xyz, 2) + .0415 * nth($xyz, 3);
+  $b: .0557 * nth($xyz, 1) - .204 * nth($xyz, 2) + 1.057 * nth($xyz, 3);
+
+  $r: _pf-rgb-to-srgb($r);
+  $g: _pf-rgb-to-srgb($g);
+  $b: _pf-rgb-to-srgb($b);
+
+  @return ($r, $g, $b);
+}
+
+@function _pf-to-yuv($color) {
+  $r: _pf-srgb-to-rgb(red($color));
+  $g: _pf-srgb-to-rgb(green($color));
+  $b: _pf-srgb-to-rgb(blue($color));
+
+  $y: 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
+  $u: -0.09991 * $r + -0.33609 * $g + 0.436 * $b;
+  $v: 0.615 * $r + -0.55861 * $g + -0.05639 * $b;
+
+  @return ($y, $v, -$u);
+}
+
+@function _pf-from-yuv($yuv) {
+  $y: nth($yuv, 1);
+  $v: nth($yuv, 2);
+  $u: -1 * nth($yuv, 3);
+
+  $r: _pf-rgb-to-srgb($y + 1.28033 * $v);
+  $g: _pf-rgb-to-srgb($y + -0.21482 * $u + -0.38059 * $v);
+  $b: _pf-rgb-to-srgb($y + 2.12798 * $u);
+
+  @return ($r, $g, $b);
+}
+
+@function _pf-xyz-to-lab-f($t) {
+  @if $t > 216 / 24389 {
+    @return pow($t, 1/3);
+  } @else {
+    @return 841 / 108 * $t + 4 / 29;
+  }
+}
+
+@function _pf-xyz-to-lab($xyz) {
+  $white: (95.05, 100, 108.9);
+
+  $x: _pf-xyz-to-lab-f(nth($xyz, 1) / nth($white, 1));
+  $y: _pf-xyz-to-lab-f(nth($xyz, 2) / nth($white, 2));
+  $z: _pf-xyz-to-lab-f(nth($xyz, 3) / nth($white, 3));
+
+  $l: 116 * $y - 16;
+  $a: 500 * ($x - $y);
+  $b: 200 * ($y - $z);
+
+  @return ($l, $a, $b);
+}
+
+@function _pf-lab-to-xyz-f($t) {
+  @if $t > 6 / 29 {
+    @return pow($t, 3);
+  } @else {
+    @return 108 / 841 * ($t - 4 / 29);
+  }
+}
+
+@function _pf-lab-to-xyz($lab) {
+  $white: (95.05, 100, 108.9);
+
+  $l: (nth($lab, 1) + 16) / 116;
+
+  $x: nth($white, 1) * _pf-lab-to-xyz-f($l + nth($lab, 2) / 500);
+  $y: nth($white, 2) * _pf-lab-to-xyz-f($l);
+  $z: nth($white, 3) * _pf-lab-to-xyz-f($l - nth($lab, 3) / 200);
+
+  @return ($x, $y, $z);
+}
+
+@function _pf-xyz-to-yuuvv($xyz) {
+  $a: nth($xyz, 1) + 15 * nth($xyz, 2) + 3 * nth($xyz, 3);
+  $uu: if($a == 0, 0, 4 * nth($xyz, 1) / $a);
+  $vv: if($a == 0, 0, 9 * nth($xyz, 2) / $a);
+  @return (nth($xyz, 2), $uu, $vv);
+}
+
+@function _pf-yuuvv-to-xyz($yuuvv) {
+  $y: nth($yuuvv, 1);
+  $uu: nth($yuuvv, 2);
+  $vv: nth($yuuvv, 3);
+
+  $x: if($vv == 0, 0, $y * (9 * $uu) / (4 * $vv));
+  $z: if($vv == 0, 0, $y * (12 - 3 * $uu - 20 * $vv) / (4 * $vv));
+
+  @return ($x, $y, $z);
+}
+
+@function _pf-xyz-to-luv($xyz) {
+  $white: _pf-xyz-to-yuuvv((95.05, 100, 108.9));
+  $yuuvv: _pf-xyz-to-yuuvv($xyz);
+
+  $y: nth($yuuvv, 1) / nth($white, 1);
+  $l: if($y > 216 / 24389, 116 * pow($y, 1 / 3) - 16, 24389 / 27 * $y);
+
+  $u: 13 * $l * (nth($yuuvv, 2) - nth($white, 2));
+  $v: 13 * $l * (nth($yuuvv, 3) - nth($white, 3));
+
+  @return ($l, $u, $v);
+}
+
+@function _pf-luv-to-xyz($luv) {
+  $white: _pf-xyz-to-yuuvv((95.05, 100, 108.9));
+
+  $uu: if(nth($luv, 1) == 0, 0, nth($luv, 2) / (13 * nth($luv, 1)) + nth($white, 2));
+  $vv: if(nth($luv, 1) == 0, 0, nth($luv, 3) / (13 * nth($luv, 1)) + nth($white, 3));
+
+  $y: nth($white, 1);
+  @if nth($luv, 1) > 8 {
+    $y: $y * pow((nth($luv, 1) + 16) / 116, 3);
+  } @else {
+    $y: $y * nth($luv, 1) * 27 / 24389;
+  }
+
+  @return _pf-yuuvv-to-xyz(($y, $uu, $vv));
+}
+
+@function _pf-lab-to-lch($lab) {
+  $l: nth($lab, 1);
+  $c: sqrt(nth($lab, 2) * nth($lab, 2) + nth($lab, 3) * nth($lab, 3));
+  $h: 0;
+  @if abs(nth($lab, 2)) > .0001 or abs(nth($lab, 3)) > .0001 {
+    $h: atan2(nth($lab, 3), nth($lab, 2)) * 1rad;
+  }
+
+  @return ($l, $c, $h);
+}
+
+@function _pf-lch-to-lab($lch) {
+  $l: nth($lch, 1);
+  $a: cos(nth($lch, 3)) * nth($lch, 2);
+  $b: sin(nth($lch, 3)) * nth($lch, 2);
+
+  @return ($l, $a, $b);
+}
+
+/// @require pow
+/// @require sqrt
+/// @require atan2
+@function _pf-to-lch($color, $colorspace: $planifolia-colorspace) {
+  @if $colorspace == 'lab' {
+    $xyz: _pf-to-xyz($color);
+    $lab: _pf-xyz-to-lab($xyz);
+    @return _pf-lab-to-lch($lab);
+  } @else if $colorspace == 'luv' {
+    $xyz: _pf-to-xyz($color);
+    $luv: _pf-xyz-to-luv($xyz);
+    @return _pf-lab-to-lch($luv);
+  } @else if $colorspace == 'hsl' {
+    $chroma: saturation($color) * lightness($color) / 100%;
+    @return (lightness($color) / 1%, $chroma / 1%, hue($color));
+  } @else if $colorspace == 'yuv' {
+    $yuv: _pf-to-yuv($color);
+    @return _pf-lab-to-lch($yuv);
+  } @else {
+    @error 'unknown colorspace: #{$colorspace}';
+  }
+}
+@function _lch-unclipped($lightness, $chroma, $hue, $colorspace) {
+  @if $colorspace == 'lab' {
+    $lab: _pf-lch-to-lab(($lightness, $chroma, $hue));
+    $xyz: _pf-lab-to-xyz($lab);
+    @return _pf-from-xyz($xyz);
+  } @else if $colorspace == 'luv' {
+    $luv: _pf-lch-to-lab(($lightness, $chroma, $hue));
+    $xyz: _pf-luv-to-xyz($luv);
+    @return _pf-from-xyz($xyz);
+  } @else if $colorspace == 'hsl' {
+    $saturation: if($lightness == 0, 0, $chroma / $lightness * 100);
+    $color: hsl($hue, $saturation * 1%, $lightness * 1%);
+    @return (red($color), green($color), blue($color));
+  } @else if $colorspace == 'yuv' {
+    $yuv: _pf-lch-to-lab(($lightness, $chroma, $hue));
+    @return _pf-from-yuv($yuv);
+  } @else {
+    @error 'unknown colorspace: #{$colorspace}';
+  }
+}
+/// Create a color from lightness, chroma, and hue values.
+///
+/// Note that the chroma is reduced if the result would otherwise be outside
+/// of the sRGB colorspace.
+///
+/// @param {number} $lightness 0 .. 100
+/// @param {number} $chroma 0 .. ca. 140
+/// @param {angle} $hue
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+///
+/// @require pow
+/// @require sin
+/// @require cos
+@function lch($lightness, $chroma, $hue, $colorspace: $planifolia-colorspace) {
+  $rgb: _lch-unclipped($lightness, $chroma, $hue, $colorspace);
+  @if _pf-clip-needed($rgb) {
+    $c-min: 0;
+    $c-max: $chroma;
+    $c-tmp: ($c-min + $c-max) / 2;
+    @while $c-max - $c-min > 0.01 {
+      $rgb: _lch-unclipped($lightness, $c-tmp, $hue, $colorspace);
+      @if _pf-clip-needed($rgb) {
+        $c-max: $c-tmp;
+      } @else {
+        $c-min: $c-tmp;
+      }
+      $c-tmp: ($c-min + $c-max) / 2;
+    }
+  }
+  @return rgb(nth($rgb, 1), nth($rgb, 2), nth($rgb, 3));
+}
+/// Create a color from lightness, chroma, hue, and alpha values.
+/// @param {number} $lightness
+/// @param {number} $chroma
+/// @param {angle} $hue
+/// @param {number} $alpha
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function lcha($lightness, $chroma, $hue, $alpha, $colorspace: $planifolia-colorspace) {
+  @return rgba(lch($lightness, $chroma, $hue, $colorspace), $alpha);
+}
+/// Get the lightness component of a color.
+/// @param {color} $color
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {number}
+@function pf-lightness($color, $colorspace: $planifolia-colorspace) {
+  @return nth(_pf-to-lch($color, $colorspace), 1);
+}
+/// Get the chroma component of a color.
+/// @param {color} $color
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {number}
+@function pf-chroma($color, $colorspace: $planifolia-colorspace) {
+  @return nth(_pf-to-lch($color, $colorspace), 2);
+}
+/// Get the hue component of a color.
+/// @param {color} $color
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {angle}
+@function pf-hue($color, $colorspace: $planifolia-colorspace) {
+  @return nth(_pf-to-lch($color, $colorspace), 3);
+}
+/// Increase or decrease one or more components of a color.
+/// @param {color} $color
+/// @param {number} $lightness [0]
+/// @param {number} $chroma [0]
+/// @param {angle} $hue [0]
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-adjust-color($color, $lightness: 0, $chroma: 0, $hue: 0, $colorspace: $planifolia-colorspace) {
+  $lch: _pf-to-lch($color, $colorspace);
+  $l: nth($lch, 1) + $lightness;
+  $c: nth($lch, 2) + $chroma;
+  $h: nth($lch, 3) + $hue;
+  @return lcha($l, $c, $h, alpha($color), $colorspace);
+}
+/// Change one or more properties of a color.
+/// @param {color} $color
+/// @param {number} $lightness [null]
+/// @param {number} $chroma [null]
+/// @param {angle} $hue [null]
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-change-color($color, $lightness: null, $chroma: null, $hue: null, $colorspace: $planifolia-colorspace) {
+  $lch: _pf-to-lch($color, $colorspace);
+  $l: if($lightness == null, nth($lch, 1), $lightness);
+  $c: if($chroma == null, nth($lch, 2), $chroma);
+  $h: if($hue == null, nth($lch, 3), $hue);
+  @return lcha($l, $c, $h, alpha($color), $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $angle
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-adjust-hue($color, $angle, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-color($color, $hue: $angle, $colorspace: $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $amount
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-lighten($color, $amount, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-color($color, $lightness: $amount, $colorspace: $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $amount
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-darken($color, $amount, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-color($color, $lightness: -$amount, $colorspace: $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $weight
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-tint($color, $weight, $colorspace: $planifolia-colorspace) {
+  @return pf-mix(white, $color, $weight, $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $weight
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-shade($color, $weight, $colorspace: $planifolia-colorspace) {
+  @return pf-mix(black, $color, $weight, $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $amount
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-saturate($color, $amount, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-color($color, $chroma: $amount, $colorspace: $colorspace);
+}
+/// @param {color} $color
+/// @param {number} $amount
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-desaturate($color, $amount, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-color($color, $chroma: -$amount, $colorspace: $colorspace);
+}
+/// @param {color} $color
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+/// @require pi
+@function pf-complement($color, $colorspace: $planifolia-colorspace) {
+  @return pf-adjust-hue($color, pi() * 1rad, $colorspace);
+}
+/// @param {color} $color
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+/// @require pi
+@function pf-grayscale($color, $colorspace: $planifolia-colorspace) {
+  @return pf-change-color($color, $chroma: 0, $colorspace: $colorspace);
+}
+/// Get the euclidean distance between two colors.
+/// @param {color} $color1
+/// @param {color} $color2
+/// @return {number}
+/// @require _pf-to-lch
+@function pf-color-distance($color1, $color2) {
+  $lab1: _pf-xyz-to-lab(_pf-to-xyz($color1));
+  $lab2: _pf-xyz-to-lab(_pf-to-xyz($color2));
+  $x1: nth($lab1, 1) - nth($lab2, 1);
+  $x2: nth($lab1, 2) - nth($lab2, 2);
+  $x3: nth($lab1, 3) - nth($lab2, 3);
+  @return sqrt($x1 * $x1 + $x2 * $x2 + $x3 * $x3);
+}
+@function _pf-lch-mix($lch1, $lch2, $weight) {
+  $w: _pf-perc($weight);
+  $l: nth($lch1, 1) * $w + nth($lch2, 1) * (1 - $w);
+  $c: nth($lch1, 2) * $w + nth($lch2, 2) * (1 - $w);
+  $w1: $w * nth($lch1, 2);
+  $w2: (1 - $w) * nth($lch2, 2);
+  @if ($w1 == 0 and $w2 == 0) {
+    $w1: .5;
+    $w2: .5;
+  }
+  $h1: nth($lch1, 3);
+  $h2: nth($lch2, 3);
+  @while abs($h2 - $h1) > pi() * 1rad {
+    $h1: $h1 + if($h1 < $h2, 2, -2) * pi() * 1rad;
+  }
+  $h: ($h1 * $w1 + $h2 * $w2) / ($w1 + $w2);
+  @return ($l, $c, $h);
+}
+/// @param {color} $color1
+/// @param {color} $color2
+/// @param {number} $weight [50%]
+/// @param {string} $colorspace ['lab'] one of 'lab', 'luv', 'hsl', 'yuv'
+/// @return {color}
+@function pf-mix($color1, $color2, $weight: 50%, $colorspace: $planifolia-colorspace) {
+  $lch1: _pf-to-lch($color1, $colorspace);
+  $lch2: _pf-to-lch($color2, $colorspace);
+  $lch: _pf-lch-mix($lch1, $lch2, $weight);
+  @return lch(nth($lch, 1), nth($lch, 2), nth($lch, 3), $colorspace);
+}
+
+////
+/// Functions to help with contrast as defined by
+/// [WCAG20](https://www.w3.org/TR/WCAG20/#contrast-ratiodef)
+///
+/// This module requires a function called `pow()`. You should make sure that
+/// one is available, e.g. by including the math module from this project.
+///
+/// @group contrast
+////
+
+/// @type color
+$planifolia-contrast-dark-default: black !default;
+/// @type color
+$planifolia-contrast-light-default: white !default;
+
+@function _pf-srgb($channel) {
+  $x: $channel / 255;
+  @if $x <= .03928 {
+    @return $x / 12.92;
+  } @else {
+    @return pow(($x + .055) / 1.055, 2.4);
+  }
+}
+
+// FIXME: namespace name
+@function alpha-blend($fg, $bg: white) {
+  $a1: alpha($bg);
+  $a2: alpha($fg);
+
+  @if ($a1 == 0) {
+    @if ($a2 == 0) {
+      @return $fg;
+    }
+  }
+
+  $a: $a2 + (1 - $a2) * $a1;
+  $r: ($a2 * red($fg) + (1 - $a2) * $a1 * red($bg)) / $a;
+  $g: ($a2 * green($fg) + (1 - $a2) * $a1 * green($bg)) / $a;
+  $b: ($a2 * blue($fg) + (1 - $a2) * $a1 * blue($bg)) / $a;
+
+  @return rgba($r, $g, $b, $a);
+}
+
+// FIXME: namespace name
+@function luma($color) {
+  $r: _pf-srgb(red($color));
+  $g: _pf-srgb(green($color));
+  $b: _pf-srgb(blue($color));
+  @return .2126 * $r + .7152 * $g + .0722 * $b;
+}
+
+@function _pf-contrast($fg, $bg) {
+  $lbg: luma($bg);
+  $lfg: luma(alpha-blend($fg, $bg));
+  @return (max($lbg, $lfg) + .05) / (min($lbg, $lfg) + .05);
+}
+
+/// Calculate the minimum possible contrast between two colors.
+///
+/// Note that the "minimum" part of this is only relevant if `$bg` is
+/// transparent. In that case, a backdrop color is chosen so that the resulting
+/// contrast is minimal.
+///
+/// @param {color} $fg foreground color
+/// @param {color} $bg background color
+/// @return {number} between 1 and 21
+@function contrast-min($fg, $bg) {
+  // optimize for the common case
+  @if alpha($bg) == 1 {
+    @return _pf-contrast($fg, $bg);
+  } @else {
+    $bg-black: alpha-blend($bg, black);
+    $bg-white: alpha-blend($bg, white);
+    $lfg: luma($fg);
+
+    @if luma($bg-white) < $lfg {
+      @return _pf-contrast($fg, $bg-white);
+    } @else if luma($bg-black) > $lfg {
+      @return _pf-contrast($fg, $bg-black);
+    } @else {
+      @return 1;
+    }
+  }
+}
+
+/// Calculate the contrast between two colors.
+///
+/// This function is different from `contrast-min` by not caring about the
+/// order of inputs. This is achieved by calculating the average of both
+/// possible results of `contrast-min`.
+///
+/// @param {color} $color1
+/// @param {color} $color2
+/// @return {number} between 1 and 21
+/// @see contrast-min
+@function contrast($color1, $color2) {
+  // optimize for the common case
+  @if alpha($color1) + alpha($color2) == 2 {
+    @return _pf-contrast($color1, $color2);
+  } @else {
+    $c1: contrast-min($color1, $color2);
+    $c2: contrast-min($color2, $color1);
+    @return ($c1 + $c2) / 2;
+  }
+}
+
+/// Pick the higher contrast option for a given base color.
+///
+/// @param {color} $base the base color to compare to
+/// @param {color} $color1 [$planifolia-contrast-dark-default] first option
+/// @param {color} $color2 [$planifolia-contrast-light-default] second option
+/// @return {color} either `$color1` or `$color2`
+@function contrast-color(
+  $base,
+  $color1: $planifolia-contrast-dark-default,
+  $color2: $planifolia-contrast-light-default
+) {
+  @if contrast($color1, $base) >= contrast($color2, $base) {
+    @return $color1;
+  } @else {
+    @return $color2;
+  }
+}
+
+/// Warn if the contrast is below a threshold
+///
+/// @param {color} $color1 background color
+/// @param {color} $color2 foreground color
+/// @param {number} $threshold [4.5]
+@function contrast-check($color1, $color2, $threshold: 4.5) {
+  $contrast: contrast($color1, $color2);
+  @if $contrast < $threshold {
+    @warn 'contrast #{$contrast} between #{$color1} and #{$color2} too low!';
+  }
+  @return null;
+}
+
+/// MATH
+///
+/// This provides some common mathemetical functions implemented in pure sass.
+///
+/// The implementations are based on taylor expansions. The `$steps` argument
+/// defines how many steps of the series will be calculated. So a higher number
+/// will result in higher precision.
+///
+/// Taylor expansions converge quickly around their centers, so a decent
+/// approximation can be calculated in constant time.
+///
+/// If the input $x is too far off of the center, it is converted to a closer
+/// value $y in a way that allows to calculate f($x) from f($y). This
+/// conversion uses exact arithmetics and can be done in constant or
+/// logarithmic time.
+///
+/// This approach is havily inspired by
+/// <http://www.sassmeister.com/gist/ad6e6771df050ff3727f>. However, the
+/// implementations are much more efficient.
+///
+/// @group math
+////
+
+/// @type number
+$planifolia-math-steps-default: 32 !default;
+
+/// @return {number}
+@function pi() {
+  @return 3.141592653589793;
+}
+
+@function _pf-angle-to-rad($x) {
+  @if unit($x) == 'deg' {
+    @return $x / 180deg * pi();
+  } @else if unit($x) == 'grad' {
+    @return $x / 200grad * pi();
+  } @else if unit($x) == 'rad' {
+    @return $x / 1rad;
+  } @else if unit($x) == 'turn' {
+    @return $x / .5turn * pi();
+  } @else {
+    @return $x;
+  }
+}
+
+@function _pf-exp-taylor-0($x, $steps) {
+  $item: 1;
+  $result: 1;
+
+  @for $i from 1 to $steps {
+    $item: $item * $x / $i;
+    $result: $result + $item;
+  }
+
+  @return $result;
+}
+
+@function _pf-ln-taylor-1($x, $steps) {
+  $z: ($x - 1) / ($x + 1);
+
+  $power: $z;
+  $result: $z;
+
+  @for $i from 1 to $steps {
+    $power: $power * $z * $z;
+    $result: $result + $power / (2 * $i + 1);
+  }
+
+  @return 2 * $result;
+}
+
+@function _pf-sin-taylor-0($x, $steps) {
+  $item: $x;
+  $result: $x;
+
+  @for $i from 1 to $steps {
+    $item: -$item * $x * $x / (2 * $i) / (2 * $i + 1);
+    $result: $result + $item;
+  }
+
+  @return $result;
+}
+
+@function _pf-asin-taylor-0($x, $steps) {
+  $item: $x;
+  $result: $x;
+
+  @for $i from 1 to $steps {
+    $item: $item * $x * $x * (2 * $i - 1) / (2 * $i);
+    $result: $result + $item / (2 * $i + 1);
+  }
+
+  @return $result;
+}
+
+@function _pf-pow-int($base, $exponent) {
+  @if $exponent < 0 {
+    @return 1 / _pf-pow-int($base, -$exponent);
+  } @else if $exponent == 0 {
+    @return 1;
+  } @else if $exponent == 1 {
+    @return $base;
+  } @else {
+    $exp: floor($exponent / 2);
+    $pow: _pf-pow-int($base, $exp);
+    @if $exp * 2 == $exponent {
+      @return $pow * $pow;
+    } @else {
+      @return $pow * $pow * $base;
+    }
+  }
+}
+
+@function _pf-log-approx($x) {
+  @if $x <= 0 {
+    @error 'cannot calculate log of #{$x}';
+  } @else if $x >= 1 {
+    // choose the smaller option (-1) because it yields better
+    // results in ln().
+    @return str-length(inspect(round($x))) - 1;
+  } @else {
+    @return -1 * str-length(inspect(round(1 / $x)));
+  }
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function ln($x, $steps: $planifolia-math-steps-default) {
+  $ln10: 2.302585092994046;
+  $approx: _pf-log-approx($x);
+  // $y is in range [1, 10]
+  $y: $x / _pf-pow-int(10, $approx);
+  @return $approx * $ln10 + _pf-ln-taylor-1($y, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function log($x, $steps: $planifolia-math-steps-default) {
+  $ln10: 2.302585092994046;
+  @return ln($x, $steps) / $ln10;
+}
+
+/// @param {number} $x
+/// @param {number} $exponent
+///   If $x is 0 or below, $exponent needs to be an integer.
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function pow($x, $exponent, $steps: $planifolia-math-steps-default) {
+  $exp1: round($exponent);
+  $exp2: $exponent - $exp1;
+  $pow1: _pf-pow-int($x, $exp1);
+  @if $exp2 == 0 {
+    @return $pow1;
+  } @else if $x == 0 and $exponent > 0 {
+    @return 0;
+  } @else {
+    $y: ln($x, $steps) * $exp2;
+    $pow2: _pf-exp-taylor-0($y, $steps);
+    @return $pow1 * $pow2;
+  }
+}
+
+/// @param {number} $x
+/// @param {number} $exponent
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function nth-root($x, $exponent, $steps: $planifolia-math-steps-default) {
+  @return pow($x, 1 / $exponent, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function sqrt($x, $steps: $planifolia-math-steps-default) {
+  @return nth-root($x, 2, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function sin($x, $steps: $planifolia-math-steps-default) {
+  $x: _pf-angle-to-rad($x);
+
+  @if $x > 2 * pi() {
+    $x: $x % (2 * pi());
+  }
+  @if $x > pi() {
+    @return -1 * sin($x - pi());
+  } @else if $x < 0 {
+    @return -1 * sin(-$x);
+  } @else {
+    @return _pf-sin-taylor-0($x, $steps);
+  }
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function cos($x, $steps: $planifolia-math-steps-default) {
+  $x: _pf-angle-to-rad($x);
+  @return sin($x + pi() / 2, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function tan($x, $steps: $planifolia-math-steps-default) {
+  @return sin($x, $steps) / cos($x, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function asin($x, $steps: $planifolia-math-steps-default) {
+  @if $x < 0 {
+    @return -1 * asin(-$x, $steps);
+  } @else if $x * $x > .5 {
+    @return acos(sqrt(1 - $x * $x, $steps), $steps);
+  } @else {
+    @return _pf-asin-taylor-0($x, $steps);
+  }
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function acos($x, $steps: $planifolia-math-steps-default) {
+  @return pi() / 2 - asin($x, $steps);
+}
+
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function atan($x, $steps: $planifolia-math-steps-default) {
+  @if $x == 0 {
+    @return 0;
+  } @else if $x < 0 {
+    @return -1 * atan(-$x, $steps);
+  } @else {
+    @return asin(1 / sqrt(1 + 1 / ($x * $x), $steps), $steps);
+  }
+}
+
+/// Computes the angle of the vector (x,y) with the x axis.
+/// @param {number} $y
+/// @param {number} $x
+/// @param {number} $steps [32] - steps of the taylor expansion
+/// @return {number}
+@function atan2($y, $x, $steps: $planifolia-math-steps-default) {
+  @if $x > 0 {
+    @return atan($y / $x, $steps);
+  } @else if $x < 0 {
+    @if $y >= 0 {
+      @return atan($y / $x, $steps) + pi();
+    } @else {
+      @return atan($y / $x, $steps) - pi();
+    }
+  } @else {
+    @if $y > 0 {
+      @return pi() / 2;
+    } @else if $y < 0 {
+      @return pi() / -2;
+    } @else {
+      @return 0;
+    }
+  }
+}
+
+@function _pf-interpolate($a, $b, $f) {
+  $result: ();
+  @for $i from 1 through length($a) {
+    $value: nth($a, $i) * (1 - $f) + nth($b, $i) * $f;
+    $result: append($result, $value);
+  }
+  @return $result;
+}
+
+/// Generic bezier interpolation.
+/// @param {P[]} $points
+/// @param {number} $f
+/// @param {function(P, P, number) => P} $interpolate [_pf-interpolate]
+///   The default is a linear interpolation between lists of numbers.
+///   You can specify a custom interpolation function, e.g. to interpolate
+///   between colors.
+/// @return {P} A single point.
+@function bezier($points, $f, $interpolate: _pf-interpolate) {
+  @if length($points) > 1 {
+    $tmp: ();
+    @for $i from 1 to length($points) {
+      $point1: nth($points, $i);
+      $point2: nth($points, $i + 1);
+      $tmp: append($tmp, call($interpolate, $point1, $point2, $f));
+    }
+    @return bezier($tmp, $f, $interpolate);
+  } @else {
+    @return nth($points, 1);
+  }
+}
