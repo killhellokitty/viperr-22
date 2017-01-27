@@ -48,11 +48,11 @@
   @if $t==normal {
     color: $text_color;
     border-color: $borders_color;
-    background-color: if($variant == 'light', pf-lighten($base_color, 2.5), pf-lighten($base_color, 2.5));
+    background-color: if($variant == 'light', pf-lighten($base_color, 2.5), pf-lighten($base_color, 1.5));
   @if $variant == 'light' {
-    @include _shadows(entry_focus_shadow(transparentize($fc, 1)), $_entry_edge, -1px -1px transparentize($wb, 0.79), 1px 1px 2px transparentize($bg-dark-dst-cmp, 0.82));
+    @include _shadows(entry_focus_shadow(transparentize($fc, 1)), $_entry_edge, -1px -1px transparentize($wb, 0.82), 1px 1px 2px transparentize($bb, 0.87));
   } @else {
-    @include _shadows(entry_focus_shadow(transparentize($fc, 1)), $_entry_edge, -1px -1px transparentize($wb, 0.975), 1px 1px 2px transparentize(pf-darken(pf-complement($base-dark-dst-cmp-cmbo), 2.3%), 0.38));
+    @include _shadows(entry_focus_shadow(transparentize($fc, 1)), $_entry_edge, -1px -1px transparentize(pf-complement($wb), 0.98), 1px 1px 2px transparentize(pf-complement($bb), 0.60));
   }
     // for the transition to work the number of shadows in different states needs to match, hence the transparent shadow here.
   }
@@ -63,7 +63,7 @@
     border-bottom-color: pf-darken(pf-mix($borders_color, $fc, 66%), 10);
     border-right-color: pf-darken(pf-mix($borders_color, $fc, 66%), 10);
    } @else {
-    @include _shadows(entry_focus_shadow($fc), $_entry_edge, -1px -1px transparentize($wb, 0.974), 1px 1px 2px transparentize(pf-complement($bb), 0.34));
+    @include _shadows(entry_focus_shadow($fc), $_entry_edge, -1px -1px transparentize(pf-complement($wb), 0.95), 1px 1px 2px transparentize(pf-complement($bb), 0.34));
     border-color: pf-darken(pf-mix($borders_color, $fc, 64%), 24);
     border-bottom-color: pf-darken(pf-mix($borders_color, $fc, 68%), 23);
     border-right-color: pf-darken(pf-mix($borders_color, $fc, 68%), 23);
@@ -73,20 +73,20 @@
   @if $t==insensitive {
     color: $insensitive_fg_color;
     border-color: $insensitive_borders_color;
-    background-color: if($variant == 'light', pf-lighten($insensitive_bg_color, 2.0), pf-lighten($insensitive_bg_color, 1.25));
+    background-color: $insensitive_bg_color;
     box-shadow: $_entry_edge;
   }
   @if $t==backdrop {
     color: $backdrop_text_color;
     border-color: $backdrop_borders_color;
     //background-color: $backdrop_base_color;
-    background-color: if($variant == 'light', pf-lighten($backdrop_base_color, 7.5), pf-lighten($backdrop_base_color, 2.5));
+    background-color: if($variant == 'light', pf-lighten($backdrop_base_color, 2.5), pf-lighten($backdrop_base_color, 1.5));
     box-shadow: $_blank_edge;
   }
   @if $t==backdrop-insensitive {
     color: $backdrop_insensitive_color;
-    border-color: pf-mix($borders_color, $bg_color, 75%);
-    background-color: if($variant == 'light', pf-darken($insensitive_bg_color, 2.5), pf-lighten($insensitive_bg_color, 0.55));
+    border-color: $backdrop_borders_color;
+    background-color: $insensitive_bg_color;
     box-shadow: $_blank_edge;
   }
   @if $t==osd {

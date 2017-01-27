@@ -5,14 +5,14 @@ var imagemin    = require('gulp-imagemin');
 var cache       = require('gulp-cache');
 var chroma      = require('chroma-js');
 var chromatic   = require("chromatic-sass");
-const osTmpdir  = require('os-tmpdir');
+var changed     = require("gulp-changed");
+var remember    = require("gulp-remember");
 
-osTmpdir();
-//=> '/var/folders/m3/5574nnhn0yj488ccryqr7tc80000gn/T'
 
 
 gulp.task('sass', function () {
     return gulp.src(['./**/sass/*.scss'])
+        .pipe(changed('sass'))
         .pipe(sass({
             outputStyle: 'expanded',
             precision: 5,
@@ -22,6 +22,7 @@ gulp.task('sass', function () {
                 notify().write(err);
             }
         }))
+        .pipe(remember('sass'))
         .pipe(rename(function (path) {
             path.dirname += "/../";
         }))
@@ -32,7 +33,12 @@ gulp.task('images', function(){
     return gulp.src('./**/assets/*')
         .pipe(cache(imagemin({
         })))
+        .pipe(remember('images'))
         .pipe(gulp.dest('./**/assets/*'))
 });
 
-gulp.task('default', ['sass','build','images']);
+gulp.task('cache:clear', function (callback) {
+    return cache.clearAll(callback)
+})
+
+gulp.task('default', ['sass','build','images','cache:clear']);

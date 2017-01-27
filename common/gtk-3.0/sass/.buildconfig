@@ -1,0 +1,8 @@
+[default]
+name=Default
+device=local
+runtime=host
+config-opts=
+prefix=/home/killhellokitty/.cache/gnome-builder/install/sass/host
+app-id=
+default=true

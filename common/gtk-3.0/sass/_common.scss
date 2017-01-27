@@ -93,11 +93,11 @@ $button_transition: all 200ms $ease-out-quad;
 .view,
 %view {
   color: $text_color;
-  background-color: $base_color;
+  background-color: if($variant == 'light', transparentize($base_color, 0.06), transparentize($base_color, 0.03));
 
   &:backdrop {
     color: $backdrop_text_color;
-    background-color: $backdrop_base_color;
+    background-color: if($variant == 'light', transparentize($backdrop_base_color, 0.06), transparentize($backdrop_base_color, 0.03));
   }
 
   &:selected {
@@ -3929,9 +3929,10 @@ tooltip {
   &.background {
     // background-color needs to be set this way otherwise it gets drawn twice
     // see https://bugzilla.gnome.org/show_bug.cgi?id=736155 for details.
-    background-color: transparentize($tooltip_bg_color, 0.2);
+    background-color: if($variant == 'light', transparentize($tooltip_bg_color, 0.22),
+    transparentize($tooltip_bg_color, 0.08));
     background-clip: padding-box;
-    border: 1px solid transparentize($tooltip_fg_contrast, 0.3); // this suble border is meant to
+    border: 1px solid transparentize($tooltip_borders, 0.065); // this suble border is meant to
                                               // not make the tooltip melt with
                                               // very dark backgrounds
   }
@@ -3947,7 +3948,7 @@ tooltip {
   * { // Yeah this is ugly
     padding: 4px;
     background-color: transparent;
-    color: transparentize($tooltip_fg_contrast, 0.8);
+    color: transparentize($tooltip_fg_color, 0.06);
   }
 }
 
@@ -4234,12 +4235,16 @@ headerbar.selection-mode button.titlebutton,
   @at-root %nobg_selected_items, & {
     color: $selected_fg_color;
 
-    &:disabled { color: mix($selected_fg_color, $selected_bg_color, 50%); }
+    &:disabled { color: $insensitive_selected_fg_color;
+      background-color: $insensitive_selected_bg_color; }
 
     &:backdrop {
+      background-color: if($variant == 'light', transparentize($backdrop_selected_bg_color, 0.06), transparentize($backdrop_selected_bg_color, 0.03));
       color: $backdrop_selected_fg_color;
 
-      &:disabled { color: mix($backdrop_selected_fg_color, $selected_bg_color, 30%); }
+      &:disabled {
+        background-color: if($variant == 'light', transparentize($backdrop_insensitive_selected_bg_color, 0.06), transparentize($backdrop_insensitive_selected_bg_color, 0.03));
+        color: $backdrop_insensitive_selected_fg_color; }
     }
   }
 }

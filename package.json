@@ -13,17 +13,15 @@
   "license": "ISC",
   "devDependencies": {
     "chroma-js": "^1.2.1",
-    "chromatic-sass": "0.0.1",
     "chromatic-sass": "^0.1.7",
     "gulp": "^3.9.1",
     "gulp-cache": "^0.4.5",
+    "gulp-changed": "^1.3.2",
     "gulp-imagemin": "^3.1.1",
+    "gulp-remember": "^0.3.1",
     "gulp-rename": "^1.2.2",
-    "gulp-sass": "^2.3.2",
+    "gulp-sass": "^3.1.0",
     "sass-planifolia": "^0.3.1",
     "sass-yiq": "^1.0.0"
-  },
-  "dependencies": {
-    "os-tmpdir": "^1.0.2"
   }
 }
